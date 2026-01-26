@@ -5,12 +5,14 @@ import { MovieCard } from "./MovieCard";
 interface MovieSectionProps {
   title: string;
   movies: Array<{
-    id: number;
+    id: string | number;
     title: string;
     year: string;
     rating: number;
     poster: string;
     genre?: string;
+    slug?: string;
+    isSeries?: boolean;
   }>;
 }
 
