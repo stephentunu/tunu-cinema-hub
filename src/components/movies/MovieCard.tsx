@@ -1,16 +1,22 @@
 import { motion } from "framer-motion";
 import { Play, Plus, Download, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 interface MovieCardProps {
+  id?: string | number;
   title: string;
   year: string;
   rating: number;
   poster: string;
   genre?: string;
+  slug?: string;
+  isSeries?: boolean;
 }
 
-export const MovieCard = ({ title, year, rating, poster, genre }: MovieCardProps) => {
+export const MovieCard = ({ id, title, year, rating, poster, genre, slug, isSeries }: MovieCardProps) => {
+  const linkTo = slug ? (isSeries ? `/series/${slug}` : `/movie/${slug}`) : "#";
+  
   return (
     <motion.div
       whileHover={{ scale: 1.05, y: -8 }}
