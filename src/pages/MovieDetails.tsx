@@ -1,4 +1,5 @@
-import { useParams } from "react-router-dom";
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useMovie } from "@/hooks/useMovies";
 import { useAddToWatchlist, useIsInWatchlist } from "@/hooks/useWatchlist";
@@ -14,17 +15,22 @@ import {
   Globe,
   Film,
   Loader2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { VideoPlayer } from "@/components/video/VideoPlayer";
+import { supabase } from "@/integrations/supabase/client";
 
 const MovieDetails = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const { data: movie, isLoading } = useMovie(slug || "");
   const { user } = useAuth();
   const { data: isInWatchlist } = useIsInWatchlist(movie?.id);
   const addToWatchlist = useAddToWatchlist();
+  const [isWatching, setIsWatching] = useState(false);
 
   const handleAddToWatchlist = async () => {
     if (!user) {
@@ -39,6 +45,59 @@ const MovieDetails = () => {
     } catch (error) {
       toast.error("Failed to add to watchlist");
     }
+  };
+
+  const handleWatchNow = () => {
+    if (!user) {
+      toast.error("Please sign in to watch movies");
+      navigate("/auth");
+      return;
+    }
+    if (!movie?.video_url) {
+      toast.error("No video available for this movie");
+      return;
+    }
+    setIsWatching(true);
+  };
+
+  const handleProgress = async (progress: number, total: number) => {
+    if (!user || !movie) return;
+    
+    // Save watch progress every 30 seconds
+    if (Math.floor(progress) % 30 === 0 && progress > 0) {
+      await supabase.from("watch_history").upsert({
+        user_id: user.id,
+        movie_id: movie.id,
+        progress_seconds: Math.floor(progress),
+        total_seconds: Math.floor(total),
+        completed: progress / total > 0.9,
+      }, {
+        onConflict: "user_id,movie_id",
+      });
+    }
+  };
+
+  const handleDownload = async (quality: string) => {
+    if (!user) {
+      toast.error("Please sign in to download movies");
+      navigate("/auth");
+      return;
+    }
+    if (!movie?.video_url) {
+      toast.error("No video available for download");
+      return;
+    }
+
+    // Log download
+    await supabase.from("downloads").insert({
+      user_id: user.id,
+      movie_id: movie.id,
+      quality,
+    });
+
+    // Open video URL for download
+    window.open(movie.video_url, "_blank");
+    toast.success(`Starting ${quality} download...`);
   };
 
   if (isLoading) {
@@ -63,6 +122,35 @@ const MovieDetails = () => {
 
   return (
     <Layout>
+      {/* Video Player Modal */}
+      <AnimatePresence>
+        {isWatching && movie.video_url && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 right-4 z-10 text-white hover:bg-white/20"
+              onClick={() => setIsWatching(false)}
+            >
+              <X className="w-6 h-6" />
+            </Button>
+            <div className="w-full max-w-7xl px-4">
+              <VideoPlayer
+                src={movie.video_url}
+                poster={movie.backdrop_url || movie.poster_url || undefined}
+                title={movie.title}
+                onProgress={handleProgress}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hero Section */}
       <div className="relative min-h-[70vh]">
         {/* Backdrop */}
@@ -154,9 +242,14 @@ const MovieDetails = () => {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-4 pt-4">
-                <Button size="xl" variant="gradient">
+                <Button 
+                  size="xl" 
+                  variant="gradient"
+                  onClick={handleWatchNow}
+                  disabled={!movie.video_url}
+                >
                   <Play className="w-5 h-5 fill-current" />
-                  Watch Now
+                  {movie.video_url ? "Watch Now" : "Coming Soon"}
                 </Button>
                 <Button
                   size="xl"
@@ -175,10 +268,6 @@ const MovieDetails = () => {
                       Add to Watchlist
                     </>
                   )}
-                </Button>
-                <Button size="xl" variant="outline">
-                  <Download className="w-5 h-5" />
-                  Download
                 </Button>
               </div>
             </motion.div>
@@ -210,14 +299,20 @@ const MovieDetails = () => {
           <div className="glass rounded-2xl p-6 border border-white/10">
             <h3 className="font-heading text-lg font-semibold mb-4">Download Options</h3>
             <div className="space-y-3">
-              {["480p", "720p", "1080p"].map((quality) => (
+              {[
+                { quality: "480p", size: "~500MB" },
+                { quality: "720p", size: "~1.2GB" },
+                { quality: "1080p", size: "~2.5GB" },
+              ].map(({ quality, size }) => (
                 <button
                   key={quality}
-                  className="w-full flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                  onClick={() => handleDownload(quality)}
+                  disabled={!movie.video_url}
+                  className="w-full flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="font-medium">{quality}</span>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{quality === "480p" ? "~500MB" : quality === "720p" ? "~1.2GB" : "~2.5GB"}</span>
+                    <span>{size}</span>
                     <Download className="w-4 h-4 text-primary" />
                   </div>
                 </button>
