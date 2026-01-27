@@ -6,7 +6,6 @@ import {
   Users,
   Film,
   Download,
-  Activity,
   Plus,
   Edit,
   Trash2,
@@ -18,10 +17,30 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { MovieForm } from "@/components/admin/MovieForm";
+import { SeriesForm } from "@/components/admin/SeriesForm";
+import type { Movie } from "@/hooks/useMovies";
+import type { Series } from "@/hooks/useSeries";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Admin = () => {
   const { user, isAdmin, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<"dashboard" | "movies" | "series" | "users">("dashboard");
+  const [showMovieForm, setShowMovieForm] = useState(false);
+  const [showSeriesForm, setShowSeriesForm] = useState(false);
+  const [editingMovie, setEditingMovie] = useState<Movie | null>(null);
+  const [editingSeries, setEditingSeries] = useState<Series | null>(null);
+  const [deleteMovieId, setDeleteMovieId] = useState<string | null>(null);
+  const [deleteSeriesId, setDeleteSeriesId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Stats queries
@@ -54,7 +73,7 @@ const Admin = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as Movie[];
     },
     enabled: isAdmin && activeTab === "movies",
   });
@@ -68,7 +87,7 @@ const Admin = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as Series[];
     },
     enabled: isAdmin && activeTab === "series",
   });
@@ -85,6 +104,39 @@ const Admin = () => {
       return data;
     },
     enabled: isAdmin && activeTab === "users",
+  });
+
+  const deleteMovieMutation = useMutation({
+    mutationFn: async (movieId: string) => {
+      const { error } = await supabase.from("movies").delete().eq("id", movieId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Movie deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["admin-movies"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to delete movie");
+    },
+  });
+
+  const deleteSeriesMutation = useMutation({
+    mutationFn: async (seriesId: string) => {
+      // First delete episodes
+      await supabase.from("episodes").delete().eq("series_id", seriesId);
+      // Then delete series
+      const { error } = await supabase.from("series").delete().eq("id", seriesId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Series deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["admin-series"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to delete series");
+    },
   });
 
   if (loading) {
@@ -107,6 +159,26 @@ const Admin = () => {
     { id: "series", label: "Series", icon: Film },
     { id: "users", label: "Users", icon: Users },
   ] as const;
+
+  const handleEditMovie = (movie: Movie) => {
+    setEditingMovie(movie);
+    setShowMovieForm(true);
+  };
+
+  const handleEditSeries = (series: Series) => {
+    setEditingSeries(series);
+    setShowSeriesForm(true);
+  };
+
+  const closeMovieForm = () => {
+    setShowMovieForm(false);
+    setEditingMovie(null);
+  };
+
+  const closeSeriesForm = () => {
+    setShowSeriesForm(false);
+    setEditingSeries(null);
+  };
 
   return (
     <Layout>
@@ -166,11 +238,23 @@ const Admin = () => {
             <div className="glass rounded-xl p-6 border border-white/10">
               <h3 className="font-heading text-lg font-semibold mb-4">Quick Actions</h3>
               <div className="flex flex-wrap gap-4">
-                <Button variant="gradient" onClick={() => setActiveTab("movies")}>
+                <Button
+                  variant="gradient"
+                  onClick={() => {
+                    setActiveTab("movies");
+                    setShowMovieForm(true);
+                  }}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Movie
                 </Button>
-                <Button variant="secondary" onClick={() => setActiveTab("series")}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setActiveTab("series");
+                    setShowSeriesForm(true);
+                  }}
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Series
                 </Button>
@@ -186,77 +270,105 @@ const Admin = () => {
         {/* Movies Tab */}
         {activeTab === "movies" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading text-2xl font-semibold">Movies</h2>
-              <Button variant="gradient">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Movie
-              </Button>
-            </div>
-
-            {moviesLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
+            {showMovieForm ? (
+              <MovieForm
+                movie={editingMovie}
+                onSuccess={closeMovieForm}
+                onCancel={closeMovieForm}
+              />
             ) : (
-              <div className="glass rounded-xl border border-white/10 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/30">
-                      <tr>
-                        <th className="text-left p-4 font-medium">Movie</th>
-                        <th className="text-left p-4 font-medium">Year</th>
-                        <th className="text-left p-4 font-medium">Rating</th>
-                        <th className="text-left p-4 font-medium">Status</th>
-                        <th className="text-left p-4 font-medium">Views</th>
-                        <th className="text-right p-4 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allMovies?.map((movie) => (
-                        <tr key={movie.id} className="border-t border-white/5 hover:bg-muted/20">
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={movie.poster_url || "https://via.placeholder.com/50x75"}
-                                alt={movie.title}
-                                className="w-10 h-14 object-cover rounded"
-                              />
-                              <span className="font-medium">{movie.title}</span>
-                            </div>
-                          </td>
-                          <td className="p-4 text-muted-foreground">{movie.release_year}</td>
-                          <td className="p-4">{movie.rating?.toFixed(1) || "N/A"}</td>
-                          <td className="p-4">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                movie.status === "published"
-                                  ? "bg-success/20 text-success"
-                                  : movie.status === "pending"
-                                  ? "bg-warning/20 text-warning"
-                                  : "bg-muted/50 text-muted-foreground"
-                              }`}
-                            >
-                              {movie.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-muted-foreground">{movie.view_count?.toLocaleString()}</td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button size="icon" variant="ghost">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="text-destructive">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-2xl font-semibold">Movies</h2>
+                  <Button variant="gradient" onClick={() => setShowMovieForm(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Movie
+                  </Button>
                 </div>
-              </div>
+
+                {moviesLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="glass rounded-xl border border-white/10 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            <th className="text-left p-4 font-medium">Movie</th>
+                            <th className="text-left p-4 font-medium">Year</th>
+                            <th className="text-left p-4 font-medium">Duration</th>
+                            <th className="text-left p-4 font-medium">Status</th>
+                            <th className="text-left p-4 font-medium">Views</th>
+                            <th className="text-right p-4 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allMovies?.map((movie) => (
+                            <tr key={movie.id} className="border-t border-white/5 hover:bg-muted/20">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={movie.poster_url || "https://via.placeholder.com/50x75"}
+                                    alt={movie.title}
+                                    className="w-10 h-14 object-cover rounded"
+                                  />
+                                  <div>
+                                    <span className="font-medium block">{movie.title}</span>
+                                    {movie.video_url && (
+                                      <span className="text-xs text-success">✓ Video uploaded</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4 text-muted-foreground">{movie.release_year}</td>
+                              <td className="p-4 text-muted-foreground">
+                                {movie.duration_minutes ? `${movie.duration_minutes} min` : "—"}
+                              </td>
+                              <td className="p-4">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs ${
+                                    movie.status === "published"
+                                      ? "bg-success/20 text-success"
+                                      : movie.status === "draft"
+                                      ? "bg-warning/20 text-warning"
+                                      : "bg-muted/50 text-muted-foreground"
+                                  }`}
+                                >
+                                  {movie.status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-muted-foreground">
+                                {movie.view_count?.toLocaleString()}
+                              </td>
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => handleEditMovie(movie)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-destructive"
+                                    onClick={() => setDeleteMovieId(movie.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -264,73 +376,92 @@ const Admin = () => {
         {/* Series Tab */}
         {activeTab === "series" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-heading text-2xl font-semibold">Series</h2>
-              <Button variant="gradient">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Series
-              </Button>
-            </div>
-
-            {seriesLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
+            {showSeriesForm ? (
+              <SeriesForm
+                series={editingSeries}
+                onSuccess={closeSeriesForm}
+                onCancel={closeSeriesForm}
+              />
             ) : (
-              <div className="glass rounded-xl border border-white/10 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/30">
-                      <tr>
-                        <th className="text-left p-4 font-medium">Series</th>
-                        <th className="text-left p-4 font-medium">Seasons</th>
-                        <th className="text-left p-4 font-medium">Rating</th>
-                        <th className="text-left p-4 font-medium">Status</th>
-                        <th className="text-right p-4 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allSeries?.map((series) => (
-                        <tr key={series.id} className="border-t border-white/5 hover:bg-muted/20">
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={series.poster_url || "https://via.placeholder.com/50x75"}
-                                alt={series.title}
-                                className="w-10 h-14 object-cover rounded"
-                              />
-                              <span className="font-medium">{series.title}</span>
-                            </div>
-                          </td>
-                          <td className="p-4 text-muted-foreground">{series.total_seasons}</td>
-                          <td className="p-4">{series.rating?.toFixed(1) || "N/A"}</td>
-                          <td className="p-4">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                series.status === "published"
-                                  ? "bg-success/20 text-success"
-                                  : "bg-muted/50 text-muted-foreground"
-                              }`}
-                            >
-                              {series.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button size="icon" variant="ghost">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="text-destructive">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-2xl font-semibold">Series</h2>
+                  <Button variant="gradient" onClick={() => setShowSeriesForm(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Series
+                  </Button>
                 </div>
-              </div>
+
+                {seriesLoading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="glass rounded-xl border border-white/10 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            <th className="text-left p-4 font-medium">Series</th>
+                            <th className="text-left p-4 font-medium">Seasons</th>
+                            <th className="text-left p-4 font-medium">Rating</th>
+                            <th className="text-left p-4 font-medium">Status</th>
+                            <th className="text-right p-4 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allSeries?.map((series) => (
+                            <tr key={series.id} className="border-t border-white/5 hover:bg-muted/20">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={series.poster_url || "https://via.placeholder.com/50x75"}
+                                    alt={series.title}
+                                    className="w-10 h-14 object-cover rounded"
+                                  />
+                                  <span className="font-medium">{series.title}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-muted-foreground">{series.total_seasons}</td>
+                              <td className="p-4">{series.rating?.toFixed(1) || "N/A"}</td>
+                              <td className="p-4">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs ${
+                                    series.status === "published"
+                                      ? "bg-success/20 text-success"
+                                      : "bg-muted/50 text-muted-foreground"
+                                  }`}
+                                >
+                                  {series.status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => handleEditSeries(series)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-destructive"
+                                    onClick={() => setDeleteSeriesId(series.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -398,6 +529,58 @@ const Admin = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Movie Dialog */}
+      <AlertDialog open={!!deleteMovieId} onOpenChange={() => setDeleteMovieId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Movie</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this movie? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteMovieId) {
+                  deleteMovieMutation.mutate(deleteMovieId);
+                  setDeleteMovieId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Series Dialog */}
+      <AlertDialog open={!!deleteSeriesId} onOpenChange={() => setDeleteSeriesId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Series</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this series and all its episodes? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteSeriesId) {
+                  deleteSeriesMutation.mutate(deleteSeriesId);
+                  setDeleteSeriesId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
