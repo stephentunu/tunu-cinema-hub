@@ -6,6 +6,7 @@ import { Loader2, Upload, X, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import {
   Form,
   FormControl,
@@ -63,6 +64,8 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
   const [backdropFile, setBackdropFile] = useState<File | null>(null);
   const [trailerFile, setTrailerFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string>("");
+  const [uploadPercent, setUploadPercent] = useState<number>(0);
+  const [currentUploadFile, setCurrentUploadFile] = useState<string>("");
   const [episodes, setEpisodes] = useState<EpisodeInput[]>([]);
   const queryClient = useQueryClient();
 
@@ -83,18 +86,47 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
     },
   });
 
-  const uploadFile = async (file: File, folder: string): Promise<string> => {
+  const uploadFileWithProgress = async (
+    file: File,
+    folder: string,
+    onProgress: (percent: number) => void
+  ): Promise<string> => {
     const fileExt = file.name.split(".").pop();
     const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-    const { error } = await supabase.storage
-      .from("media")
-      .upload(fileName, file);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
 
-    if (error) throw error;
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const url = `${supabaseUrl}/storage/v1/object/media/${fileName}`;
 
-    const { data } = supabase.storage.from("media").getPublicUrl(fileName);
-    return data.publicUrl;
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const { data } = supabase.storage.from("media").getPublicUrl(fileName);
+          resolve(data.publicUrl);
+        } else {
+          reject(new Error(`Upload failed: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener("error", () => {
+        reject(new Error("Upload failed"));
+      });
+
+      xhr.open("POST", url);
+      xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+      xhr.setRequestHeader("x-upsert", "true");
+      xhr.send(file);
+    });
   };
 
   const generateSlug = (title: string): string => {
@@ -136,18 +168,24 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
       let backdropUrl = series?.backdrop_url;
       let trailerUrl = series?.trailer_url;
 
-      // Upload files
+      // Upload files with progress tracking
       if (posterFile) {
+        setCurrentUploadFile("poster");
         setUploadProgress("Uploading poster...");
-        posterUrl = await uploadFile(posterFile, "posters");
+        setUploadPercent(0);
+        posterUrl = await uploadFileWithProgress(posterFile, "posters", setUploadPercent);
       }
       if (backdropFile) {
+        setCurrentUploadFile("backdrop");
         setUploadProgress("Uploading backdrop...");
-        backdropUrl = await uploadFile(backdropFile, "backdrops");
+        setUploadPercent(0);
+        backdropUrl = await uploadFileWithProgress(backdropFile, "backdrops", setUploadPercent);
       }
       if (trailerFile) {
+        setCurrentUploadFile("trailer");
         setUploadProgress("Uploading trailer...");
-        trailerUrl = await uploadFile(trailerFile, "trailers");
+        setUploadPercent(0);
+        trailerUrl = await uploadFileWithProgress(trailerFile, "trailers", setUploadPercent);
       }
 
       const slug = series?.slug || generateSlug(data.title);
@@ -199,11 +237,13 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
       if (episodes.length > 0 && seriesId) {
         for (let i = 0; i < episodes.length; i++) {
           const episode = episodes[i];
+          setCurrentUploadFile(`episode-${i + 1}`);
           setUploadProgress(`Uploading episode ${i + 1} of ${episodes.length}...`);
+          setUploadPercent(0);
 
           let videoUrl = null;
           if (episode.videoFile) {
-            videoUrl = await uploadFile(episode.videoFile, "episodes");
+            videoUrl = await uploadFileWithProgress(episode.videoFile, "episodes", setUploadPercent);
           }
 
           const { error } = await supabase.from("episodes").insert({
@@ -589,9 +629,15 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
           )}
 
           {uploadProgress && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {uploadProgress}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {uploadProgress}
+                </div>
+                <span className="font-medium text-primary">{uploadPercent}%</span>
+              </div>
+              <Progress value={uploadPercent} className="h-2" />
             </div>
           )}
 
