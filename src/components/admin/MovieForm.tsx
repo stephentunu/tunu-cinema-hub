@@ -359,58 +359,101 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Poster Image</label>
-                <div className="flex items-center gap-2">
-                  <Input
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('poster-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {posterFile ? posterFile.name : 'Choose poster image...'}
+                  </Button>
+                  <input
+                    id="poster-input"
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
-                    className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
+                    className="hidden"
                   />
-                  {posterFile && (
-                    <span className="text-xs text-muted-foreground truncate max-w-24">
-                      {posterFile.name}
-                    </span>
+                  {movie?.poster_url && !posterFile && (
+                    <span className="text-xs text-muted-foreground">Current: {movie.poster_url.split('/').pop()}</span>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Backdrop Image</label>
-                <div className="flex items-center gap-2">
-                  <Input
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('backdrop-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {backdropFile ? backdropFile.name : 'Choose backdrop image...'}
+                  </Button>
+                  <input
+                    id="backdrop-input"
                     type="file"
-                    accept="image/*"
-                    onChange={(e) =>
-                      setBackdropFile(e.target.files?.[0] || null)
-                    }
-                    className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => setBackdropFile(e.target.files?.[0] || null)}
+                    className="hidden"
                   />
+                  {movie?.backdrop_url && !backdropFile && (
+                    <span className="text-xs text-muted-foreground">Current: {movie.backdrop_url.split('/').pop()}</span>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Trailer Video</label>
-                <div className="flex items-center gap-2">
-                  <Input
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('trailer-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {trailerFile ? trailerFile.name : 'Choose trailer video...'}
+                  </Button>
+                  <input
+                    id="trailer-input"
                     type="file"
-                    accept="video/*"
-                    onChange={(e) =>
-                      setTrailerFile(e.target.files?.[0] || null)
-                    }
-                    className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
+                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                    onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
+                    className="hidden"
                   />
+                  {movie?.trailer_url && !trailerFile && (
+                    <span className="text-xs text-muted-foreground">Current: {movie.trailer_url.split('/').pop()}</span>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Full Movie Video</label>
-                <div className="flex items-center gap-2">
-                  <Input
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('video-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {videoFile ? videoFile.name : 'Choose movie video...'}
+                  </Button>
+                  <input
+                    id="video-input"
                     type="file"
-                    accept="video/*"
+                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
                     onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                    className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
+                    className="hidden"
                   />
+                  {movie?.video_url && !videoFile && (
+                    <span className="text-xs text-muted-foreground">Current: {movie.video_url.split('/').pop()}</span>
+                  )}
                 </div>
               </div>
             </div>
