@@ -422,7 +422,7 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
                   <input
                     id="trailer-input"
                     type="file"
-                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                    accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                     onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
                     className="hidden"
                   />
@@ -447,7 +447,7 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
                   <input
                     id="video-input"
                     type="file"
-                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                    accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                     onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
                     className="hidden"
                   />
