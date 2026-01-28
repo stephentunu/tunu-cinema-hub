@@ -418,32 +418,68 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Poster Image</label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
-                  className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
-                />
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('series-poster-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {posterFile ? posterFile.name : 'Choose poster...'}
+                  </Button>
+                  <input
+                    id="series-poster-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Backdrop Image</label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setBackdropFile(e.target.files?.[0] || null)}
-                  className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
-                />
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('series-backdrop-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {backdropFile ? backdropFile.name : 'Choose backdrop...'}
+                  </Button>
+                  <input
+                    id="series-backdrop-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => setBackdropFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Trailer Video</label>
-                <Input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
-                  className="file:mr-2 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-primary/20 file:text-primary file:text-sm"
-                />
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => document.getElementById('series-trailer-input')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {trailerFile ? trailerFile.name : 'Choose trailer...'}
+                  </Button>
+                  <input
+                    id="series-trailer-input"
+                    type="file"
+                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                    onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -524,14 +560,27 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Video File</label>
-                      <Input
-                        type="file"
-                        accept="video/*"
-                        onChange={(e) =>
-                          updateEpisode(index, "videoFile", e.target.files?.[0] || null)
-                        }
-                        className="file:mr-2 file:px-2 file:py-0.5 file:rounded file:border-0 file:bg-primary/20 file:text-primary file:text-xs"
-                      />
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start text-xs"
+                          onClick={() => document.getElementById(`episode-video-${index}`)?.click()}
+                        >
+                          <Upload className="w-3 h-3 mr-1" />
+                          {episode.videoFile ? episode.videoFile.name : 'Choose video...'}
+                        </Button>
+                        <input
+                          id={`episode-video-${index}`}
+                          type="file"
+                          accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                          onChange={(e) =>
+                            updateEpisode(index, "videoFile", e.target.files?.[0] || null)
+                          }
+                          className="hidden"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
