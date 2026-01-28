@@ -475,7 +475,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
                   <input
                     id="series-trailer-input"
                     type="file"
-                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                    accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                     onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
                     className="hidden"
                   />
@@ -574,7 +574,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
                         <input
                           id={`episode-video-${index}`}
                           type="file"
-                          accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*"
+                          accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                           onChange={(e) =>
                             updateEpisode(index, "videoFile", e.target.files?.[0] || null)
                           }
