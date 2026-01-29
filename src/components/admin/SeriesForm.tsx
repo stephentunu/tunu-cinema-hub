@@ -6,7 +6,6 @@ import { Loader2, Upload, X, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
 import {
   Form,
   FormControl,
@@ -25,6 +24,9 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useChunkedUpload } from "@/hooks/useChunkedUpload";
+import { FileDropZone } from "./FileDropZone";
+import { UploadProgressBar } from "./UploadProgressBar";
 import type { Series } from "@/hooks/useSeries";
 
 const seriesSchema = z.object({
@@ -58,16 +60,24 @@ interface SeriesFormProps {
   onCancel: () => void;
 }
 
+interface UploadState {
+  fileName: string;
+  percent: number;
+  speed?: string;
+  remainingTime?: string;
+  uploadedBytes?: number;
+  totalBytes?: number;
+}
+
 export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => {
   const [loading, setLoading] = useState(false);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [backdropFile, setBackdropFile] = useState<File | null>(null);
   const [trailerFile, setTrailerFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<string>("");
-  const [uploadPercent, setUploadPercent] = useState<number>(0);
-  const [currentUploadFile, setCurrentUploadFile] = useState<string>("");
+  const [currentUpload, setCurrentUpload] = useState<UploadState | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeInput[]>([]);
   const queryClient = useQueryClient();
+  const { uploadFile, cancelUpload } = useChunkedUpload();
 
   const form = useForm<SeriesFormData>({
     resolver: zodResolver(seriesSchema),
@@ -85,49 +95,6 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
       is_featured: series?.is_featured || false,
     },
   });
-
-  const uploadFileWithProgress = async (
-    file: File,
-    folder: string,
-    onProgress: (percent: number) => void
-  ): Promise<string> => {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData?.session?.access_token;
-
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const url = `${supabaseUrl}/storage/v1/object/media/${fileName}`;
-
-      xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          onProgress(percent);
-        }
-      });
-
-      xhr.addEventListener("load", () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const { data } = supabase.storage.from("media").getPublicUrl(fileName);
-          resolve(data.publicUrl);
-        } else {
-          reject(new Error(`Upload failed: ${xhr.statusText}`));
-        }
-      });
-
-      xhr.addEventListener("error", () => {
-        reject(new Error("Upload failed"));
-      });
-
-      xhr.open("POST", url);
-      xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
-      xhr.setRequestHeader("x-upsert", "true");
-      xhr.send(file);
-    });
-  };
 
   const generateSlug = (title: string): string => {
     return title
@@ -170,22 +137,22 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
 
       // Upload files with progress tracking
       if (posterFile) {
-        setCurrentUploadFile("poster");
-        setUploadProgress("Uploading poster...");
-        setUploadPercent(0);
-        posterUrl = await uploadFileWithProgress(posterFile, "posters", setUploadPercent);
+        setCurrentUpload({ fileName: posterFile.name, percent: 0 });
+        posterUrl = await uploadFile(posterFile, "posters", (progress) => {
+          setCurrentUpload({ fileName: posterFile.name, ...progress });
+        });
       }
       if (backdropFile) {
-        setCurrentUploadFile("backdrop");
-        setUploadProgress("Uploading backdrop...");
-        setUploadPercent(0);
-        backdropUrl = await uploadFileWithProgress(backdropFile, "backdrops", setUploadPercent);
+        setCurrentUpload({ fileName: backdropFile.name, percent: 0 });
+        backdropUrl = await uploadFile(backdropFile, "backdrops", (progress) => {
+          setCurrentUpload({ fileName: backdropFile.name, ...progress });
+        });
       }
       if (trailerFile) {
-        setCurrentUploadFile("trailer");
-        setUploadProgress("Uploading trailer...");
-        setUploadPercent(0);
-        trailerUrl = await uploadFileWithProgress(trailerFile, "trailers", setUploadPercent);
+        setCurrentUpload({ fileName: trailerFile.name, percent: 0 });
+        trailerUrl = await uploadFile(trailerFile, "trailers", (progress) => {
+          setCurrentUpload({ fileName: trailerFile.name, ...progress });
+        });
       }
 
       const slug = series?.slug || generateSlug(data.title);
@@ -211,7 +178,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
         trailer_url: trailerUrl || null,
       };
 
-      setUploadProgress("Saving series...");
+      setCurrentUpload({ fileName: "Saving series...", percent: 100 });
 
       let seriesId = series?.id;
 
@@ -237,13 +204,16 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
       if (episodes.length > 0 && seriesId) {
         for (let i = 0; i < episodes.length; i++) {
           const episode = episodes[i];
-          setCurrentUploadFile(`episode-${i + 1}`);
-          setUploadProgress(`Uploading episode ${i + 1} of ${episodes.length}...`);
-          setUploadPercent(0);
-
+          
           let videoUrl = null;
           if (episode.videoFile) {
-            videoUrl = await uploadFileWithProgress(episode.videoFile, "episodes", setUploadPercent);
+            setCurrentUpload({ fileName: episode.videoFile.name, percent: 0 });
+            videoUrl = await uploadFile(episode.videoFile, "episodes", (progress) => {
+              setCurrentUpload({
+                fileName: `Episode ${i + 1}: ${episode.videoFile!.name}`,
+                ...progress,
+              });
+            });
           }
 
           const { error } = await supabase.from("episodes").insert({
@@ -268,8 +238,13 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
       toast.error(error.message || "Failed to save series");
     } finally {
       setLoading(false);
-      setUploadProgress("");
+      setCurrentUpload(null);
     }
+  };
+
+  const handleCancelUpload = () => {
+    cancelUpload();
+    setCurrentUpload(null);
   };
 
   return (
@@ -449,196 +424,138 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
             />
           </div>
 
-          {/* File uploads */}
+          {/* File uploads with drag and drop */}
           <div className="space-y-4">
             <h4 className="font-medium text-sm text-muted-foreground">
-              Media Files
+              Media Files (drag & drop or click to browse)
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Poster Image</label>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => document.getElementById('series-poster-input')?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {posterFile ? posterFile.name : 'Choose poster...'}
-                  </Button>
-                  <input
-                    id="series-poster-input"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </div>
-              </div>
+              <FileDropZone
+                id="series-poster"
+                label="Poster Image"
+                type="image"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                file={posterFile}
+                onFileSelect={setPosterFile}
+                existingUrl={series?.poster_url}
+              />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Backdrop Image</label>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => document.getElementById('series-backdrop-input')?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {backdropFile ? backdropFile.name : 'Choose backdrop...'}
-                  </Button>
-                  <input
-                    id="series-backdrop-input"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={(e) => setBackdropFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </div>
-              </div>
+              <FileDropZone
+                id="series-backdrop"
+                label="Backdrop Image"
+                type="image"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                file={backdropFile}
+                onFileSelect={setBackdropFile}
+                existingUrl={series?.backdrop_url}
+              />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Trailer Video</label>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => document.getElementById('series-trailer-input')?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {trailerFile ? trailerFile.name : 'Choose trailer...'}
-                  </Button>
-                  <input
-                    id="series-trailer-input"
-                    type="file"
-                    accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
-                    onChange={(e) => setTrailerFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </div>
-              </div>
+              <FileDropZone
+                id="series-trailer"
+                label="Trailer Video"
+                type="video"
+                accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
+                file={trailerFile}
+                onFileSelect={setTrailerFile}
+                existingUrl={series?.trailer_url}
+              />
             </div>
           </div>
 
-          {/* Episodes section */}
-          {!series && (
-            <div className="space-y-4 border-t border-white/10 pt-6">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">Episodes</h4>
-                <Button type="button" variant="outline" size="sm" onClick={addEpisode}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Episode
-                </Button>
-              </div>
-
-              {episodes.map((episode, index) => (
-                <div
-                  key={index}
-                  className="bg-muted/30 rounded-lg p-4 space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      Episode {index + 1}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeEpisode(index)}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Season</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={episode.season_number}
-                        onChange={(e) =>
-                          updateEpisode(index, "season_number", parseInt(e.target.value) || 1)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Episode #</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={episode.episode_number}
-                        onChange={(e) =>
-                          updateEpisode(index, "episode_number", parseInt(e.target.value) || 1)
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Title</label>
-                      <Input
-                        value={episode.title}
-                        onChange={(e) => updateEpisode(index, "title", e.target.value)}
-                        placeholder="Episode title"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Duration (min)</label>
-                      <Input
-                        type="number"
-                        value={episode.duration_minutes}
-                        onChange={(e) =>
-                          updateEpisode(index, "duration_minutes", parseInt(e.target.value) || 0)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Video File</label>
-                      <div className="flex flex-col gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full justify-start text-xs"
-                          onClick={() => document.getElementById(`episode-video-${index}`)?.click()}
-                        >
-                          <Upload className="w-3 h-3 mr-1" />
-                          {episode.videoFile ? episode.videoFile.name : 'Choose video...'}
-                        </Button>
-                        <input
-                          id={`episode-video-${index}`}
-                          type="file"
-                          accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
-                          onChange={(e) =>
-                            updateEpisode(index, "videoFile", e.target.files?.[0] || null)
-                          }
-                          className="hidden"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {/* Episodes Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-sm text-muted-foreground">
+                Episodes
+              </h4>
+              <Button type="button" variant="outline" size="sm" onClick={addEpisode}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Episode
+              </Button>
             </div>
-          )}
 
-          {uploadProgress && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {uploadProgress}
+            {episodes.map((episode, index) => (
+              <div
+                key={index}
+                className="p-4 rounded-lg border border-white/10 bg-muted/30 space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">
+                    Episode {index + 1}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeEpisode(index)}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
                 </div>
-                <span className="font-medium text-primary">{uploadPercent}%</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    type="number"
+                    placeholder="Season #"
+                    value={episode.season_number}
+                    onChange={(e) =>
+                      updateEpisode(index, "season_number", parseInt(e.target.value) || 1)
+                    }
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Episode #"
+                    value={episode.episode_number}
+                    onChange={(e) =>
+                      updateEpisode(index, "episode_number", parseInt(e.target.value) || 1)
+                    }
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Duration (min)"
+                    value={episode.duration_minutes}
+                    onChange={(e) =>
+                      updateEpisode(index, "duration_minutes", parseInt(e.target.value) || 0)
+                    }
+                  />
+                </div>
+
+                <Input
+                  placeholder="Episode title"
+                  value={episode.title}
+                  onChange={(e) => updateEpisode(index, "title", e.target.value)}
+                />
+
+                <Textarea
+                  placeholder="Episode description..."
+                  rows={2}
+                  value={episode.description}
+                  onChange={(e) => updateEpisode(index, "description", e.target.value)}
+                />
+
+                <FileDropZone
+                  id={`episode-video-${index}`}
+                  label="Episode Video"
+                  type="video"
+                  accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
+                  file={episode.videoFile}
+                  onFileSelect={(file) => updateEpisode(index, "videoFile", file)}
+                />
               </div>
-              <Progress value={uploadPercent} className="h-2" />
-            </div>
+            ))}
+          </div>
+
+          {currentUpload && (
+            <UploadProgressBar
+              fileName={currentUpload.fileName}
+              percent={currentUpload.percent}
+              speed={currentUpload.speed}
+              remainingTime={currentUpload.remainingTime}
+              uploadedBytes={currentUpload.uploadedBytes}
+              totalBytes={currentUpload.totalBytes}
+              onCancel={handleCancelUpload}
+            />
           )}
 
           <div className="flex gap-4 pt-4">
@@ -646,7 +563,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
+                  Uploading...
                 </>
               ) : (
                 <>
