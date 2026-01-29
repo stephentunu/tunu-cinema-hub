@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Zap } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +9,8 @@ interface UploadProgressBarProps {
   remainingTime?: string;
   uploadedBytes?: number;
   totalBytes?: number;
+  chunksCompleted?: number;
+  totalChunks?: number;
   onCancel?: () => void;
 }
 
@@ -19,6 +21,8 @@ export const UploadProgressBar = ({
   remainingTime,
   uploadedBytes,
   totalBytes,
+  chunksCompleted,
+  totalChunks,
   onCancel,
 }: UploadProgressBarProps) => {
   const formatBytes = (bytes: number) => {
@@ -61,7 +65,17 @@ export const UploadProgressBar = ({
               {formatBytes(uploadedBytes)} / {formatBytes(totalBytes)}
             </span>
           )}
-          {speed && <span>{speed}</span>}
+          {speed && (
+            <span className="flex items-center gap-1">
+              <Zap className="w-3 h-3 text-primary" />
+              {speed}
+            </span>
+          )}
+          {chunksCompleted !== undefined && totalChunks !== undefined && totalChunks > 1 && (
+            <span className="text-muted-foreground/70">
+              Chunk {chunksCompleted}/{totalChunks}
+            </span>
+          )}
         </div>
         {remainingTime && <span>{remainingTime} remaining</span>}
       </div>
