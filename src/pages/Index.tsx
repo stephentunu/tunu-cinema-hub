@@ -27,7 +27,7 @@ const Index = () => {
     <Layout>
       <HeroCarousel />
       
-      <div className="container mx-auto px-6 space-y-4">
+      <div className="container mx-auto px-4 sm:px-6 space-y-4">
         <ContinueWatching />
         
         {isLoading ? (
