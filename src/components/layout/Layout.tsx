@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Sidebar, MobileMenuTrigger } from "./Sidebar";
+import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,17 +15,13 @@ export const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background flex w-full">
-      {/* Mobile sidebar with AnimatePresence for smooth transitions */}
-      <AnimatePresence>
-        {(isMobile ? sidebarOpen : true) && (
-          <Sidebar 
-            isOpen={sidebarOpen} 
-            onClose={() => setSidebarOpen(false)} 
-          />
-        )}
-      </AnimatePresence>
+      {/* Sidebar - always render but control visibility internally */}
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+      />
       
-      <div className={`flex-1 transition-all duration-300 ${isMobile ? 'ml-0' : 'lg:ml-[260px]'}`}>
+      <div className={`flex-1 transition-all duration-300 ${isMobile ? 'ml-0' : 'ml-[260px]'}`}>
         <Header 
           onMenuClick={() => setSidebarOpen(true)} 
           showMenuButton={isMobile} 

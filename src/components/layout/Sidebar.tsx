@@ -53,23 +53,19 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
   // Close sidebar on route change for mobile
   useEffect(() => {
-    if (isMobile && onClose) {
+    if (isMobile && onClose && isOpen) {
       onClose();
     }
-  }, [location.pathname, isMobile, onClose]);
+  }, [location.pathname]);
 
   // For mobile, we use the isOpen prop to control visibility
   // For desktop, sidebar is always visible
   const showSidebar = isMobile ? isOpen : true;
 
-  if (!showSidebar && isMobile) {
-    return null;
-  }
-
   return (
     <>
       {/* Mobile overlay */}
-      {isMobile && isOpen && (
+      {isMobile && showSidebar && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -79,19 +75,20 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         />
       )}
 
-      <motion.aside
-        initial={isMobile ? { x: -280 } : false}
-        animate={{ 
-          width: isMobile ? 280 : (isCollapsed ? 80 : 260),
-          x: 0 
-        }}
-        exit={isMobile ? { x: -280 } : undefined}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className={cn(
-          "fixed left-0 top-0 h-screen glass-sidebar z-50 flex flex-col",
-          isMobile && "shadow-2xl"
-        )}
-      >
+      {showSidebar && (
+        <motion.aside
+          initial={isMobile ? { x: -280 } : false}
+          animate={{ 
+            width: isMobile ? 280 : (isCollapsed ? 80 : 260),
+            x: 0 
+          }}
+          exit={isMobile ? { x: -280 } : undefined}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className={cn(
+            "fixed left-0 top-0 h-screen glass-sidebar z-50 flex flex-col",
+            isMobile && "shadow-2xl"
+          )}
+        >
         {/* Logo */}
         <div className="flex items-center justify-between gap-3 p-5 border-b border-white/5">
           <div className="flex items-center gap-3">
@@ -254,7 +251,8 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             )}
           </motion.button>
         )}
-      </motion.aside>
+        </motion.aside>
+      )}
     </>
   );
 };

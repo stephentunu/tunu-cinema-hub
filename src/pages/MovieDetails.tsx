@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { useMovie } from "@/hooks/useMovies";
 import { useAddToWatchlist, useIsInWatchlist } from "@/hooks/useWatchlist";
@@ -25,12 +25,21 @@ import { supabase } from "@/integrations/supabase/client";
 
 const MovieDetails = () => {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: movie, isLoading } = useMovie(slug || "");
   const { user } = useAuth();
   const { data: isInWatchlist } = useIsInWatchlist(movie?.id);
   const addToWatchlist = useAddToWatchlist();
   const [isWatching, setIsWatching] = useState(false);
+
+  // Auto-play if autoplay param is set
+  useEffect(() => {
+    const shouldAutoplay = searchParams.get("autoplay") === "true";
+    if (shouldAutoplay && movie?.video_url && user) {
+      setIsWatching(true);
+    }
+  }, [searchParams, movie, user]);
 
   const handleAddToWatchlist = async () => {
     if (!user) {
