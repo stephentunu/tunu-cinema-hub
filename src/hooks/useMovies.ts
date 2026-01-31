@@ -41,6 +41,21 @@ export const useMovies = () => {
   });
 };
 
+export const useAllMovies = () => {
+  return useQuery({
+    queryKey: ["all-movies"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("movies")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Movie[];
+    },
+  });
+};
+
 export const useFeaturedMovies = () => {
   return useQuery({
     queryKey: ["featured-movies"],

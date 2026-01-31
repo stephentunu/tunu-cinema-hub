@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Play, Plus, Download, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface MovieCardProps {
   id?: string | number;
@@ -12,16 +12,29 @@ interface MovieCardProps {
   genre?: string;
   slug?: string;
   isSeries?: boolean;
+  videoUrl?: string | null;
 }
 
-export const MovieCard = ({ id, title, year, rating, poster, genre, slug, isSeries }: MovieCardProps) => {
-  const linkTo = slug ? (isSeries ? `/series/${slug}` : `/movie/${slug}`) : "#";
+export const MovieCard = ({ id, title, year, rating, poster, genre, slug, isSeries, videoUrl }: MovieCardProps) => {
+  const navigate = useNavigate();
+  const detailPath = slug ? (isSeries ? `/series/${slug}` : `/movie/${slug}`) : "#";
+  
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Navigate to detail page with autoplay param
+    navigate(`${detailPath}?autoplay=true`);
+  };
+
+  const handleCardClick = () => {
+    navigate(detailPath);
+  };
   
   return (
     <motion.div
       whileHover={{ scale: 1.05, y: -8 }}
       transition={{ duration: 0.3 }}
       className="relative group cursor-pointer"
+      onClick={handleCardClick}
     >
       {/* Glow Effect */}
       <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-secondary rounded-xl opacity-0 group-hover:opacity-50 blur-lg transition-all duration-500" />
@@ -50,14 +63,14 @@ export const MovieCard = ({ id, title, year, rating, poster, genre, slug, isSeri
             whileHover={{ opacity: 1, y: 0 }}
             className="absolute bottom-0 left-0 right-0 p-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300"
           >
-            <Button size="sm" variant="gradient" className="flex-1 gap-1">
+            <Button size="sm" variant="gradient" className="flex-1 gap-1" onClick={handlePlay}>
               <Play className="w-4 h-4" />
               Play
             </Button>
-            <Button size="icon" variant="outline" className="shrink-0">
+            <Button size="icon" variant="outline" className="shrink-0" onClick={(e) => e.stopPropagation()}>
               <Plus className="w-4 h-4" />
             </Button>
-            <Button size="icon" variant="outline" className="shrink-0">
+            <Button size="icon" variant="outline" className="shrink-0" onClick={(e) => e.stopPropagation()}>
               <Download className="w-4 h-4" />
             </Button>
           </motion.div>

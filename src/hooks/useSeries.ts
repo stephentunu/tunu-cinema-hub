@@ -52,6 +52,21 @@ export const useSeries = () => {
   });
 };
 
+export const useAllSeries = () => {
+  return useQuery({
+    queryKey: ["all-series"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("series")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Series[];
+    },
+  });
+};
+
 export const useFeaturedSeries = () => {
   return useQuery({
     queryKey: ["featured-series"],

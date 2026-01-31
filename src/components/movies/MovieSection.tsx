@@ -13,6 +13,7 @@ interface MovieSectionProps {
     genre?: string;
     slug?: string;
     isSeries?: boolean;
+    videoUrl?: string | null;
   }>;
 }
 
