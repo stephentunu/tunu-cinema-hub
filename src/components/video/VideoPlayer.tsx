@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 
@@ -9,6 +9,14 @@ interface VideoPlayerProps {
   title?: string;
   onProgress?: (progress: number, total: number) => void;
 }
+
+// Supported video formats for HTML5 video
+const SUPPORTED_FORMATS = ['.mp4', '.webm', '.ogg', '.mov'];
+
+const isFormatSupported = (url: string): boolean => {
+  const lowerUrl = url.toLowerCase();
+  return SUPPORTED_FORMATS.some(format => lowerUrl.endsWith(format));
+};
 
 export const VideoPlayer = ({ src, poster, title, onProgress }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -20,6 +28,9 @@ export const VideoPlayer = ({ src, poster, title, onProgress }: VideoPlayerProps
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  
+  const formatSupported = isFormatSupported(src);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -94,6 +105,41 @@ export const VideoPlayer = ({ src, poster, title, onProgress }: VideoPlayerProps
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Show unsupported format message
+  if (!formatSupported || hasError) {
+    const fileExtension = src.split('.').pop()?.toUpperCase() || 'Unknown';
+    return (
+      <div
+        ref={containerRef}
+        className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center"
+        style={poster ? { backgroundImage: `url(${poster})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+      >
+        <div className="absolute inset-0 bg-black/70" />
+        <div className="relative z-10 text-center p-6 max-w-md">
+          <AlertTriangle className="w-16 h-16 text-warning mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">
+            {hasError ? "Video Playback Error" : "Unsupported Video Format"}
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            {hasError 
+              ? "There was an error playing this video. The file may be corrupted or in an unsupported format."
+              : `This video is in ${fileExtension} format which cannot be played in the browser.`}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Supported formats: MP4, WebM, OGG, MOV
+          </p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => window.open(src, '_blank')}
+          >
+            Download Video Instead
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -108,6 +154,7 @@ export const VideoPlayer = ({ src, poster, title, onProgress }: VideoPlayerProps
         className="w-full h-full object-contain"
         onTimeUpdate={handleTimeUpdate}
         onEnded={() => setIsPlaying(false)}
+        onError={() => setHasError(true)}
         onLoadedMetadata={() => {
           if (videoRef.current) {
             setDuration(videoRef.current.duration);
