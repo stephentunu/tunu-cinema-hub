@@ -102,7 +102,7 @@ const handler = async (req: Request): Promise<Response> => {
               </ul>
               
               <div style="text-align: center; margin: 32px 0;">
-                <a href="https://tunu-cinema.lovable.app" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #ec4899); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 30px; font-weight: 600; font-size: 16px; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);">
+                <a href="https://tunu-cinema.vercel.app/" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #ec4899); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 30px; font-weight: 600; font-size: 16px; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);">
                   Start Watching Now 🍿
                 </a>
               </div>
