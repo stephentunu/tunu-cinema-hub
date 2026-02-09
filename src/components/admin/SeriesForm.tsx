@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChunkedUpload } from "@/hooks/useChunkedUpload";
 import { FileDropZone } from "./FileDropZone";
+import { VideoInput } from "./VideoInput";
 import { UploadProgressBar } from "./UploadProgressBar";
 import type { Series } from "@/hooks/useSeries";
 
@@ -52,6 +53,7 @@ interface EpisodeInput {
   description: string;
   duration_minutes: number;
   videoFile: File | null;
+  videoUrl: string;
 }
 
 interface SeriesFormProps {
@@ -74,6 +76,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [backdropFile, setBackdropFile] = useState<File | null>(null);
   const [trailerFile, setTrailerFile] = useState<File | null>(null);
+  const [trailerUrl, setTrailerUrl] = useState(series?.trailer_url || "");
   const [currentUpload, setCurrentUpload] = useState<UploadState | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeInput[]>([]);
   const queryClient = useQueryClient();
@@ -114,6 +117,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
         description: "",
         duration_minutes: 45,
         videoFile: null,
+        videoUrl: "",
       },
     ]);
   };
@@ -133,7 +137,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
     try {
       let posterUrl = series?.poster_url;
       let backdropUrl = series?.backdrop_url;
-      let trailerUrl = series?.trailer_url;
+      let trailerUrlFinal = trailerUrl || series?.trailer_url;
 
       // Upload files with progress tracking
       if (posterFile) {
@@ -150,7 +154,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
       }
       if (trailerFile) {
         setCurrentUpload({ fileName: trailerFile.name, percent: 0 });
-        trailerUrl = await uploadFile(trailerFile, "trailers", (progress) => {
+        trailerUrlFinal = await uploadFile(trailerFile, "trailers", (progress) => {
           setCurrentUpload({ fileName: trailerFile.name, ...progress });
         });
       }
@@ -175,7 +179,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
         is_featured: data.is_featured || false,
         poster_url: posterUrl || null,
         backdrop_url: backdropUrl || null,
-        trailer_url: trailerUrl || null,
+        trailer_url: trailerUrlFinal || null,
       };
 
       setCurrentUpload({ fileName: "Saving series...", percent: 100 });
@@ -205,10 +209,10 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
         for (let i = 0; i < episodes.length; i++) {
           const episode = episodes[i];
           
-          let videoUrl = null;
+          let episodeVideoUrl = episode.videoUrl || null;
           if (episode.videoFile) {
             setCurrentUpload({ fileName: episode.videoFile.name, percent: 0 });
-            videoUrl = await uploadFile(episode.videoFile, "episodes", (progress) => {
+            episodeVideoUrl = await uploadFile(episode.videoFile, "episodes", (progress) => {
               setCurrentUpload({
                 fileName: `Episode ${i + 1}: ${episode.videoFile!.name}`,
                 ...progress,
@@ -223,7 +227,7 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
             title: episode.title,
             description: episode.description || null,
             duration_minutes: episode.duration_minutes || null,
-            video_url: videoUrl,
+            video_url: episodeVideoUrl,
           });
 
           if (error) throw error;
@@ -451,13 +455,13 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
                 existingUrl={series?.backdrop_url}
               />
 
-              <FileDropZone
+              <VideoInput
                 id="series-trailer"
                 label="Trailer Video"
-                type="video"
-                accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                 file={trailerFile}
                 onFileSelect={setTrailerFile}
+                url={trailerUrl}
+                onUrlChange={setTrailerUrl}
                 existingUrl={series?.trailer_url}
               />
             </div>
@@ -534,13 +538,13 @@ export const SeriesForm = ({ series, onSuccess, onCancel }: SeriesFormProps) => 
                   onChange={(e) => updateEpisode(index, "description", e.target.value)}
                 />
 
-                <FileDropZone
+                <VideoInput
                   id={`episode-video-${index}`}
                   label="Episode Video"
-                  type="video"
-                  accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                   file={episode.videoFile}
                   onFileSelect={(file) => updateEpisode(index, "videoFile", file)}
+                  url={episode.videoUrl}
+                  onUrlChange={(url) => updateEpisode(index, "videoUrl", url)}
                 />
               </div>
             ))}
