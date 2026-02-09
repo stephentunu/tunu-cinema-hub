@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChunkedUpload } from "@/hooks/useChunkedUpload";
 import { FileDropZone } from "./FileDropZone";
+import { VideoInput } from "./VideoInput";
 import { UploadProgressBar } from "./UploadProgressBar";
 import { supabase } from "@/integrations/supabase/client";
 import type { Movie } from "@/hooks/useMovies";
@@ -66,6 +67,8 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
   const [backdropFile, setBackdropFile] = useState<File | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [trailerFile, setTrailerFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState(movie?.video_url || "");
+  const [trailerUrl, setTrailerUrl] = useState(movie?.trailer_url || "");
   const [currentUpload, setCurrentUpload] = useState<UploadState | null>(null);
   const queryClient = useQueryClient();
   const { uploadFile, cancelUpload } = useChunkedUpload();
@@ -99,8 +102,8 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
     try {
       let posterUrl = movie?.poster_url;
       let backdropUrl = movie?.backdrop_url;
-      let videoUrl = movie?.video_url;
-      let trailerUrl = movie?.trailer_url;
+      let videoUrlFinal = videoUrl || movie?.video_url;
+      let trailerUrlFinal = trailerUrl || movie?.trailer_url;
 
       // Upload files with progress tracking
       if (posterFile) {
@@ -123,7 +126,7 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
       }
       if (trailerFile) {
         setCurrentUpload({ fileName: trailerFile.name, percent: 0 });
-        trailerUrl = await uploadFile(trailerFile, "trailers", (progress) => {
+        trailerUrlFinal = await uploadFile(trailerFile, "trailers", (progress) => {
           setCurrentUpload({
             fileName: trailerFile.name,
             ...progress,
@@ -132,7 +135,7 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
       }
       if (videoFile) {
         setCurrentUpload({ fileName: videoFile.name, percent: 0 });
-        videoUrl = await uploadFile(videoFile, "videos", (progress) => {
+        videoUrlFinal = await uploadFile(videoFile, "videos", (progress) => {
           setCurrentUpload({
             fileName: videoFile.name,
             ...progress,
@@ -160,8 +163,8 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
         is_featured: data.is_featured || false,
         poster_url: posterUrl || null,
         backdrop_url: backdropUrl || null,
-        video_url: videoUrl || null,
-        trailer_url: trailerUrl || null,
+        video_url: videoUrlFinal || null,
+        trailer_url: trailerUrlFinal || null,
       };
 
       setCurrentUpload({ fileName: "Saving movie...", percent: 100 });
@@ -401,23 +404,23 @@ export const MovieForm = ({ movie, onSuccess, onCancel }: MovieFormProps) => {
                 existingUrl={movie?.backdrop_url}
               />
 
-              <FileDropZone
+              <VideoInput
                 id="movie-trailer"
                 label="Trailer Video"
-                type="video"
-                accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                 file={trailerFile}
                 onFileSelect={setTrailerFile}
+                url={trailerUrl}
+                onUrlChange={setTrailerUrl}
                 existingUrl={movie?.trailer_url}
               />
 
-              <FileDropZone
+              <VideoInput
                 id="movie-video"
                 label="Full Movie Video"
-                type="video"
-                accept=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v,.mpeg,.mpg,.3gp,.ts,video/*"
                 file={videoFile}
                 onFileSelect={setVideoFile}
+                url={videoUrl}
+                onUrlChange={setVideoUrl}
                 existingUrl={movie?.video_url}
               />
             </div>
